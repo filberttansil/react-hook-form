@@ -1,5 +1,6 @@
 import { DevTool } from "@hookform/devtools";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useEffect } from "react";
+import { FieldErrors, useFieldArray, useForm } from "react-hook-form";
 
 let renderCount = 0;
 type FormValues = {
@@ -12,34 +13,108 @@ type FormValues = {
   };
   phoneNumber: string[];
   phNumbers: { number: string }[];
+  age: number;
+  dob: Date;
 };
 export default function BasicForm() {
   renderCount++;
-  // Setting defaultValues untuk state, buat useForm menerima args obj dgn defaultValues
-  const { register, control, handleSubmit, formState } = useForm<FormValues>({
+
+  /**
+   * Setting defaultValues untuk state, buat useForm menerima args obj dgn defaultValues
+   */
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState,
+    watch,
+    getValues,
+    setValue,
+    reset,
+  } = useForm<FormValues>({
     defaultValues: {
-      username: "filbert",
+      username: "",
       email: "",
       channel: "",
       social: { twitter: "", instagram: "" },
       phoneNumber: ["", ""],
+      // Dynamic Form
       phNumbers: [{ number: "" }],
+      age: 0,
+      dob: new Date(),
     },
   });
-  // Untuk mengakses error message destructure dari formState dari useForm
-  const { errors } = formState;
+
+  /**
+   * Untuk mengakses error message destructure dari formState dari useForm
+   */
+
+  const { errors, isDirty, isValid, isSubmitting, isSubmitSuccessful } =
+    formState;
+
   const onSubmit = (data: FormValues) => {
     console.log(data);
   };
 
-  // Dynamic Form
+  /**
+   * onError ini akan menjadi argumen kedua dalam function bawaan RHF handleSubmit yang dimana kegunaannya untuk dapat mengcustom error message atau untuk mengirim reports ke logging server
+   */
+
+  const onError = (errors: FieldErrors<FormValues>) => {
+    console.log("Form errors:", errors);
+  };
+
+  /**
+   * Dynamic form menggunakan useFieldArray, append => tambah field , remove => hapus berdasarkan index
+   */
   const { remove, append, fields } = useFieldArray({
     name: "phNumbers",
     control,
   });
+
+  /**
+   * Mantau value menggunakan method watch
+   */
+
+  // useEffect(() => {
+  //   const subs = watch((value) => {
+  //     console.log(value.username);
+  //   });
+  //   return () => subs.unsubscribe();
+  // }, [watch]);
+
+  /**
+   * Method getValues jika tidak dikasi argument maka akan return semua value form
+   */
+
+  const handleGetValues = () => {
+    console.log("Get Values:", getValues("social.twitter"));
+  };
+
+  /**
+   * Method setValue untuk men-set value secara programatik
+   */
+  const handleSetValues = () => {
+    setValue("username", "", {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+  };
+  /**
+   * Mereset form dengan method reset secara programatik dengan state isSubmitSuccessfull
+   */
+  useEffect(() => {
+    if (isSubmitSuccessful) {
+      reset();
+      console.log(isSubmitSuccessful);
+    }
+  }, [isSubmitSuccessful, reset]);
   return (
-    <div onSubmit={handleSubmit(onSubmit)}>
+    <div onSubmit={handleSubmit(onSubmit, onError)}>
       <h1 className="text-xl font-bold">RenderCount : {renderCount / 2}</h1>
+
       <form className="max-w-sm mx-auto" noValidate>
         <div className="mb-5">
           <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
@@ -100,6 +175,8 @@ export default function BasicForm() {
           />
           <p className="text-red-800">{errors.channel?.message}</p>
         </div>
+
+        {/* Conditionally disable the input form */}
         <div className="mb-5">
           <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
             Twitter
@@ -109,6 +186,12 @@ export default function BasicForm() {
             className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 "
             {...register("social.twitter", {
               required: { value: true, message: "Twitter is required" },
+
+              /**
+               * If Channel is empty we disable the Twitter input, this cause the value will be undefined and the validation is ignored
+               */
+
+              disabled: watch("channel") === "",
             })}
           />
           <p className="text-red-800">{errors.social?.twitter?.message}</p>
@@ -175,7 +258,36 @@ export default function BasicForm() {
             </div>
           );
         })}
-        <div className="flex justify-between">
+
+        <div className="mb-5">
+          <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+            Age
+          </label>
+          <input
+            type="number"
+            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 "
+            {...register("age", {
+              valueAsNumber: true,
+              required: { value: true, message: "Age is required" },
+            })}
+          />
+          <p className="text-red-800">{errors.age?.message}</p>
+        </div>
+        <div className="mb-5">
+          <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+            Date of birth
+          </label>
+          <input
+            type="date"
+            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 "
+            {...register("dob", {
+              valueAsDate: true,
+              required: { value: true, message: "Date of Birth is required" },
+            })}
+          />
+          <p className="text-red-800">{errors.dob?.message}</p>
+        </div>
+        <div className="flex flex-wrap gap-5">
           <button
             type="button"
             onClick={() => append({ number: "" })}
@@ -185,9 +297,34 @@ export default function BasicForm() {
           </button>
           <button
             type="submit"
-            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+            /**
+             * Disabling button if form is not modified / valid value / form is being submitting to prevent multiple submit
+             */
+            disabled={!isDirty || isSubmitting}
+            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 disabled:bg-red-600 disabled:hover:bg-red-800"
           >
             Submit
+          </button>
+          <button
+            type="button"
+            onClick={handleGetValues}
+            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          >
+            Get Values
+          </button>
+          <button
+            type="button"
+            onClick={handleSetValues}
+            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          >
+            Set Values
+          </button>
+          <button
+            type="button"
+            onClick={() => reset()}
+            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+          >
+            Reset
           </button>
         </div>
       </form>
@@ -195,3 +332,8 @@ export default function BasicForm() {
     </div>
   );
 }
+/**
+ * Touched => apakah user telah berinteraksi dengan field ?
+ * Dirty => apakah user telah modify value dari field ?
+ * isDirty => method yang mereturn boolean jika value telah termodify ( Berguna untuk membuat fitur tombol submit form enabled jika user telah memodifikasi value )
+ */
